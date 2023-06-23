@@ -1,0 +1,16 @@
+*{
+    margin: 0;
+    padding: 0;
+}
+
+main{
+    border: 1px black solid ;
+    width: 50vh;
+    justify-content: center;
+}
+ form {
+    display:flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+ }
