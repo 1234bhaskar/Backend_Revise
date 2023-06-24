@@ -1,5 +1,6 @@
 import express from "express";
 import path from "path";
+import mongoose from "mongoose";
 
 const app = express();
 
@@ -50,18 +51,52 @@ app.get("/success", (req, res) => {
   //res.sendFile("index.html");
   res.render("success");
 });
-app.post("/contacts", (req, res) => {
-  console.log(req.body);
-  //console.log(req.body.name);
-  users.push({ userName: req.body.name, userEmail: req.body.email });
-  //res.render("success");
-  res.redirect("/success");
-});
+
+// app.post("/contacts", (req, res) => {
+//   console.log(req.body);
+//   //console.log(req.body.name);
+//   users.push({ userName: req.body.name, userEmail: req.body.email });
+//   //res.render("success");
+//   res.redirect("/success");
+// });
 
 app.get("/users", (req, res) => {
   res.json({
     users,
   });
+});
+
+//Connecting to database MongoDB
+mongoose
+  .connect("mongodb://127.0.0.1:27017", {
+    dbName: "Backend_Revise",
+  })
+  .then(() => console.log("Database Connected"))
+  .catch(() => {
+    console.log("error");
+  });
+
+//Creating Schema
+const dbSchema = new mongoose.Schema({
+  name: String,
+  email: String,
+});
+//Creating Modle/Collection
+const Message = mongoose.model("Message", dbSchema);
+
+app.get("/add", async (req, res) => {
+  await Message.create({ name: "bhaskar", email: "bhas@113" });
+  res.send("NICE");
+});
+
+app.post("/contacts", async (req, res) => {
+  console.log(req.body);
+  //console.log(req.body.name);
+  const { name, email } = req.body;
+  //users.push({ userName: req.body.name, userEmail: req.body.email });
+  //res.render("success");
+  await Message.create({ name: name, email: email });
+  res.redirect("/success");
 });
 
 app.listen(5000, () => {
