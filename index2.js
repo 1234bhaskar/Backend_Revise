@@ -1,11 +1,11 @@
 import express from "express";
 import path from "path";
-import mongoose from "mongoose";
+import mongoose, { Schema } from "mongoose";
 import cookieParser from "cookie-parser";
-
+import jwt from "jsonwebtoken";
 const app = express();
 
-const users = [];
+//const users = [];
 
 // app.get("/", (req, res) => {
 //   res.send("HI");
@@ -17,13 +17,13 @@ const users = [];
 // });
 
 //JSON imp
-app.get("/products", (req, res) => {
-  //res.sendStatus(500);
-  res.json({
-    success: true,
-    product: [],
-  });
-});
+// app.get("/products", (req, res) => {
+//   //res.sendStatus(500);
+//   res.json({
+//     success: true,
+//     product: [],
+//   });
+// });
 // app.get("/", (req, res) => {
 //   const pathloction = path.resolve();
 //   res.sendFile(path.join(pathloction, "./index.html"));
@@ -49,10 +49,10 @@ app.use(express.static(path.join(path.resolve(), "public")));
 //using middleware
 app.use(express.urlencoded({ extended: true }));
 //using redirect
-app.get("/success", (req, res) => {
-  //res.sendFile("index.html");
-  res.render("success");
-});
+// app.get("/success", (req, res) => {
+//   //res.sendFile("index.html");
+//   res.render("success");
+// });
 
 // app.post("/contacts", (req, res) => {
 //   console.log(req.body);
@@ -62,11 +62,11 @@ app.get("/success", (req, res) => {
 //   res.redirect("/success");
 // });
 
-app.get("/users", (req, res) => {
-  res.json({
-    users,
-  });
-});
+// app.get("/users", (req, res) => {
+//   res.json({
+//     users,
+//   });
+// });
 
 //Connecting to database MongoDB
 mongoose
@@ -79,43 +79,66 @@ mongoose
   });
 
 //Creating Schema
-const dbSchema = new mongoose.Schema({
+// const dbSchema = new mongoose.Schema({
+//   name: String,
+//   email: String,
+// });
+//Creating Modle/Collection
+//const Message = mongoose.model("Message", dbSchema);
+
+// app.get("/add", async (req, res) => {
+//   await Message.create({ name: "bhaskar", email: "bhas@113" });
+//   res.send("NICE");
+// });
+
+// app.post("/contacts", async (req, res) => {
+//   console.log(req.body);
+//   //console.log(req.body.name);
+//   const { name, email } = req.body;
+//   //users.push({ userName: req.body.name, userEmail: req.body.email });
+//   //res.render("success");
+//   await Message.create({ name: name, email: email });
+//   res.redirect("/success");
+// });
+
+// db creation 2 connecting  db to  form
+
+const userSchema = new mongoose.Schema({
   name: String,
   email: String,
+  password: String,
 });
-//Creating Modle/Collection
-const Message = mongoose.model("Message", dbSchema);
-
-app.get("/add", async (req, res) => {
-  await Message.create({ name: "bhaskar", email: "bhas@113" });
-  res.send("NICE");
-});
-
-app.post("/contacts", async (req, res) => {
-  console.log(req.body);
-  //console.log(req.body.name);
-  const { name, email } = req.body;
-  //users.push({ userName: req.body.name, userEmail: req.body.email });
-  //res.render("success");
-  await Message.create({ name: name, email: email });
-  res.redirect("/success");
-});
+const User = mongoose.model("User", userSchema);
 
 //authentication
-const isAuthenticated = (req, res, next) => {
+const isAuthenticated = async (req, res, next) => {
   const { token } = req.cookies;
   if (token) {
+    const decoded = jwt.verify(token, "qwertyuiopasdfghjkl");
+    req.user = await User.findById(decoded._id);
     next();
+
     //res.render("logout");
   } else {
-    res.render("login");
+    res.redirect("/login");
   }
 };
 app.use(cookieParser());
 
 app.get("/", isAuthenticated, (req, res) => {
-  res.render("logout");
+  //console.log(user);
+  res.render("logout", { name: req.user.name });
 });
+app.get("/login", (req, res) => {
+  res.render("login");
+});
+app.get("/register", (req, res) => {
+  res.render("register");
+});
+// app.get("/login", (req, res) => {
+//   res.render("login");
+// });
+
 // app.get("/", (req, res) => {
 //   // console.log(req.cookies);
 //   // console.log(req.cookies.token);
@@ -127,12 +150,51 @@ app.get("/", isAuthenticated, (req, res) => {
 //   }
 //   //res.render("login");
 // });
-app.post("/login", (req, res) => {
-  res.cookie("token", "iamIN", {
+
+app.post("/register", async (req, res) => {
+  const { name, email, password } = req.body;
+
+  //console.log(req.body);
+  //imp - if destructuring object we can use key-value if they are same ,like this
+  let user = await User.findOne({ email });
+  if (user) {
+    //return console.log("Register first");
+    return res.redirect("/login");
+  }
+  user = await User.create({
+    name,
+    email,
+    password,
+  });
+
+  const token = jwt.sign({ _id: user._id }, "qwertyuiopasdfghjkl");
+
+  res.cookie("token", token, {
     httpOnly: true,
     expires: new Date(Date.now() + 60 * 1000),
   });
+  // res.cookie("token", user._id, {
+  //   httpOnly: true,
+  //   expires: new Date(Date.now() + 60 * 1000),
+  // });
 
+  res.redirect("/");
+});
+
+app.post("/login", async (req, res) => {
+  const { email, password } = req.body;
+  let user = await User.findOne({ email });
+  if (!user) return res.redirect("/register");
+  const isMatch = user.password == password;
+  if (!isMatch) {
+    return res.render("login", { email, message: "Incorrect Password" });
+  }
+
+  const token = jwt.sign({ _id: user._id }, "qwertyuiopasdfghjkl");
+  res.cookie("token", token, {
+    httpOnly: true,
+    expires: new Date(Date.now() + 60 * 1000),
+  });
   res.redirect("/");
 });
 app.get("/logout", (req, res) => {
